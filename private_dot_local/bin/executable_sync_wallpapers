@@ -1,0 +1,5 @@
+#!/usr/bin/fish
+for file in (find /media/windows/SteamLibrary/steamapps/workshop/content/431960/ -regex ".+\.[mp4|flv|mkv]+")
+    echo "coping $file"
+    cp -n "$file" ~/Videos/Wallpapers/
+end
