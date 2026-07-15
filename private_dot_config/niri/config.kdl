@@ -24,10 +24,14 @@ environment {
   QT_IM_MODULE "fcitx"
   XMODIFIERS "@im=fcitx"
   SDL_IM_MODULE "fcitx"
-  GLFW_IM_MODULE "ibus"
+  GLFW_IM_MODULE "fcitx"
   QT_IM_MODULES "wayland;fcitx;ibus"
 
+  QT_QPA_PLATFORM "wayland"
   QT_QPA_PLATFORMTHEME "qt6ct"
+  ELECTRON_OZONE_PLATFORM_HINT "auto"
+  XDG_SESSION_TYPE "wayland"
+  XDG_CURRENT_DESKTOP "niri"
 
   EDITOR "nvim"
 }
@@ -59,6 +63,7 @@ output "eDP-1" {
 layout {
     gaps 12
     center-focused-column "never"
+    background-color "transparent"
     preset-column-widths {
         proportion 0.33332
         proportion 0.5
@@ -88,8 +93,7 @@ layout {
     struts {
     }
 }
-spawn-at-startup "qs" "-c" "noctalia-shell"
-spawn-sh-at-startup "qs -c noctalia-shell ipc call lockScreen lock"
+spawn-at-startup "noctalia"
 //spawn-at-startup "dms" "run"
 spawn-sh-at-startup "fcitx5 -d"
 
@@ -180,6 +184,7 @@ animations {
     spring damping-ratio=0.7 stiffness=600 epsilon=0.0001
   }
 }
+
 prefer-no-csd
 
 /-window-rule {
@@ -220,10 +225,11 @@ window-rule {
   match app-id="thunar" title="文件操作进度"
   match app-id="waypaper"
   match app-id="clipse-gui"
-  match title="群聊的聊天记录"
-  match title="聊天记录"
-  match title="日历"
-  match title="重命名"
+  match app-id="QQ" title="群聊的聊天记录"
+  match app-id="QQ" title="聊天记录"
+  match app-id="QQ" title="日历"
+  match app-id="QQ" title="重命名"
+  match app-id="QQ" title="图片查看器"
   match app-id="btrfs-assistant"
   match app-id="markpix"
   match title="Steam 设置"
@@ -242,10 +248,13 @@ window-rule {
   match app-id="steam"
   match app-id="QQ"
   match app-id="firefox"
+  match app-id="splayer"
   draw-border-with-background false
 }
 window-rule {
   match app-id="code"
+  match app-id="Thunar"
+  match app-id="org.kde.dolphin"
   opacity 0.9
 }
 window-rule {
@@ -266,28 +275,27 @@ window-rule {
 
 // Set the overview wallpaper on the backdrop.
 layer-rule {
-  match namespace="^noctalia-overview*"
+  match namespace="mpvpaper"
+  match namespace="^noctalia-wallpaper*"
   //match namespace="^we-layer*"
   place-within-backdrop true
 }
 
 debug {
     honor-xdg-activation-with-invalid-serial
-    ignore-drm-device "/dev/dri/by-path/pci-0000:01:00.0-card"
-    ignore-drm-device "/dev/dri/by-path/pci-0000:01:00.0-render"
 }
 
 binds {
-    F2 allow-when-locked=true hotkey-overlay-title=null { spawn-sh "pkill qs || qs -c noctalia-shell"; }
+    F2 allow-when-locked=true hotkey-overlay-title=null { spawn-sh "pkill noctalia || noctalia"; }
 
     Mod+Shift+Slash { show-hotkey-overlay; }
     Mod+T hotkey-overlay-title="启动终端: kitty" { spawn "kitty"; }
-    Mod+A hotkey-overlay-title="软件列表" { spawn "qs" "-c" "noctalia-shell" "ipc" "call" "launcher" "toggle"; }
+    Mod+A hotkey-overlay-title="软件列表" { spawn "noctalia" "msg" "panel-toggle" "launcher"; }
     Mod+B hotkey-overlay-title="启动浏览器" {spawn "firefox";}
     Mod+C hotkey-overlay-title="启动代码编辑器" {spawn "/usr/bin/code";}
-    Mod+E hotkey-overlay-title="启动文件管理器" {spawn "thunar";}
-    Mod+X hotkey-overlay-title="启动剪贴板"{spawn "qs" "-c" "noctalia-shell" "ipc" "call" "launcher" "clipboard";}
-    Super+Alt+L hotkey-overlay-title="锁定屏幕: swaylock" { spawn "qs" "-c" "noctalia-shell" "ipc" "call" "sessionMenu" "lockAndSuspend"; }
+    Mod+E hotkey-overlay-title="启动文件管理器" {spawn "dolphin";}
+    Mod+X hotkey-overlay-title="启动剪贴板"{spawn "noctalia" "msg" "panel-toggle" "clipboard";}
+    Super+Alt+L hotkey-overlay-title="锁定屏幕" { spawn "noctalia" "msg" "session" "lock"; }
     F1 allow-when-locked=true hotkey-overlay-title=null { spawn-sh "pkill fcitx5 || fcitx5"; }
     XF86AudioRaiseVolume allow-when-locked=true { spawn-sh "wpctl set-volume @DEFAULT_AUDIO_SINK@ 0.1+"; }
     XF86AudioLowerVolume allow-when-locked=true { spawn-sh "wpctl set-volume @DEFAULT_AUDIO_SINK@ 0.1-"; }
@@ -405,7 +413,7 @@ binds {
     Print { screenshot-screen; }
     Alt+Print { screenshot-window; }
     Mod+Escape allow-inhibiting=false { toggle-keyboard-shortcuts-inhibit; }
-    Ctrl+Alt+Delete hotkey-overlay-title="启动回话菜单" { spawn "qs" "-c" "noctalia-shell" "ipc" "call" "sessionMenu" "toggle"; }
+    Ctrl+Alt+Delete hotkey-overlay-title="启动回话菜单" { spawn "noctalia" "msg" "panel-toggle" "session"; }
     Mod+Shift+P { power-off-monitors; }
 }
 
