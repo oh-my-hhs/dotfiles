@@ -249,6 +249,7 @@ window-rule {
   match app-id="QQ"
   match app-id="firefox"
   match app-id="splayer"
+  match app-id="mihomo-party"
   draw-border-with-background false
 }
 window-rule {
@@ -293,7 +294,7 @@ binds {
     Mod+A hotkey-overlay-title="软件列表" { spawn "noctalia" "msg" "panel-toggle" "launcher"; }
     Mod+B hotkey-overlay-title="启动浏览器" {spawn "firefox";}
     Mod+C hotkey-overlay-title="启动代码编辑器" {spawn "/usr/bin/code";}
-    Mod+E hotkey-overlay-title="启动文件管理器" {spawn "dolphin";}
+    Mod+E hotkey-overlay-title="启动文件管理器" {spawn "thunar";}
     Mod+X hotkey-overlay-title="启动剪贴板"{spawn "noctalia" "msg" "panel-toggle" "clipboard";}
     Super+Alt+L hotkey-overlay-title="锁定屏幕" { spawn "noctalia" "msg" "session" "lock"; }
     F1 allow-when-locked=true hotkey-overlay-title=null { spawn-sh "pkill fcitx5 || fcitx5"; }
