@@ -76,12 +76,14 @@ function proxy_set
         git config --global https.proxy "127.0.0.1:7890"
     end
 end
+
 function proxy_on
     set -gx http_proxy "127.0.0.1:7890"
     set -gx https_proxy "127.0.0.1:7890"
     git config --global http.proxy "127.0.0.1:7890"
     git config --global https.proxy "127.0.0.1:7890"
 end
+
 function proxy_off
     set -e http_proxy
     set -e https_proxy
@@ -89,6 +91,9 @@ function proxy_off
     git config --global https.proxy ""
 end
 
+function proxy_stat
+    printf "current proxy:$http_proxy\n"
+end
 if status is-interactive
     pokego --no-title -r 1,3,6
     # Commands to run in interactive sessions can go here

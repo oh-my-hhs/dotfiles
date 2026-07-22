@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# 内存实时监控，默认每 2 秒刷新
+interval=${1:-2}
+watch -n "$interval" '
+  echo "=== zswap ==="
+  if grep -q "^Zswap:" /proc/meminfo 2>/dev/null; then
+    grep -E "^Zswap:|^Zswapped:" /proc/meminfo
+    printf "压缩比: "
+    awk "/^Zswap:/{p=\$2} /^Zswapped:/{o=\$2} END{if(p>0)printf \"%.1f:1\\n\", o/p; else print \"N/A\"}" /proc/meminfo
+  else
+    echo "zswap 未启用"
+  fi
+
+  echo
+  echo "=== zram ==="
+  if [ -e /sys/block/zram0/mm_stat ]; then
+    zramctl 2>/dev/null | tail -n +2
+  else
+    echo "zram 未启用"
+  fi
+
+  echo
+  echo "=== 内存 ==="
+  free -h
+
+  echo
+  echo "=== TOP 内存占用进程 ==="
+  ps aux --sort=-%mem | head -8
+'

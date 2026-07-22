@@ -1,0 +1,79 @@
+#!/usr/bin/env bash
+# 内存详细诊断
+
+echo "=== 系统内存 (meminfo) ==="
+grep -E "^(MemTotal|MemFree|MemAvailable|SwapTotal|SwapFree|SwapCached|AnonPages|Shmem|Unevictable|Committed_AS|Dirty|Writeback|Active|Inactive|Mlocked)" /proc/meminfo
+
+echo
+echo "=== zswap ==="
+if [ -f /sys/module/zswap/parameters/enabled ]; then
+  grep -E "Zswap|Zswapped" /proc/meminfo
+  echo "enabled: $(cat /sys/module/zswap/parameters/enabled)"
+  echo "compressor: $(cat /sys/module/zswap/parameters/compressor)"
+  echo "max_pool_percent: $(cat /sys/module/zswap/parameters/max_pool_percent)%"
+else
+  echo "zswap 未启用"
+fi
+
+echo
+echo "=== zram ==="
+if [ -e /sys/block/zram0/mm_stat ]; then
+  echo "mm_stat: $(cat /sys/block/zram0/mm_stat)"
+  echo "bd_stat: $(cat /sys/block/zram0/bd_stat 2>/dev/null || echo N/A)"
+  echo "io_stat: $(cat /sys/block/zram0/io_stat 2>/dev/null || echo N/A)"
+  read -r o c m _ < /sys/block/zram0/mm_stat
+  echo "---"
+  printf "orig_data:  %s (%d pages)\n" "$(numfmt --to=iec "$o")" $((o / 4096))
+  printf "compr_data: %s\n" "$(numfmt --to=iec "$c")"
+  printf "mem_used:   %s\n" "$(numfmt --to=iec "$m")"
+  echo "---"
+  echo "block stat: $(cat /sys/block/zram0/stat)"
+  echo "累计写入: $(awk '{printf "%.1f MB (%d IO)", $7*512/1048576, $5}' /sys/block/zram0/stat)"
+  echo "累计读取: $(awk '{printf "%.1f MB (%d IO)", $3*512/1048576, $1}' /sys/block/zram0/stat)"
+fi
+
+echo
+echo "=== DMA / 碎片情况 ==="
+grep "^DMA" /proc/buddyinfo 2>/dev/null || echo "N/A"
+
+echo
+echo "=== slab 内存 (内核缓存) ==="
+if [ -r /proc/slabinfo ]; then
+  head -5 /proc/slabinfo | awk '{print $1, $2, $3, $4}'
+  echo "... (共 $(wc -l < /proc/slabinfo) 行)"
+else
+  echo "(需 root 权限: sudo cat /proc/slabinfo)"
+fi
+
+echo
+echo "=== 页大小 & HugePages ==="
+grep -E "HugePages|PageSize|PageTables" /proc/meminfo
+
+echo
+echo "=== swap 槽位使用分析 ==="
+swap_used=$(($(awk '/SwapTotal/{print $2}' /proc/meminfo) - $(awk '/SwapFree/{print $2}' /proc/meminfo)))
+swap_total=$(awk '/SwapTotal/{print $2}' /proc/meminfo)
+echo "swap 总大小: $((swap_total / 4)) pages ($((swap_total)) kB)"
+echo "swap 标记已用: $((swap_used / 4)) pages ($((swap_used)) kB)"
+
+if [ -e /sys/block/zram0/mm_stat ]; then
+  read -r o _ _ _ _ _ _ _ _ < /sys/block/zram0/mm_stat
+  zram_pages=$((o / 4096))
+  echo "zram 实存页: $zram_pages pages ($((o)) bytes)"
+
+  if [ -f /sys/module/zswap/parameters/enabled ]; then
+    zswap_orig=$(awk '/^Zswapped:/ {print $2}' /proc/meminfo 2>/dev/null || echo 0)
+    zswap_pool=$(awk '/^Zswap:/ {print $2}' /proc/meminfo 2>/dev/null || echo 0)
+    if [ -n "$zswap_orig" ] && [ "$zswap_orig" -gt 0 ] 2>/dev/null; then
+      echo "zswap 原始数据: $((zswap_orig * 1024)) bytes ($((zswap_orig / 4)) pages)"
+      echo "zswap 池占用:   $((zswap_pool * 1024)) bytes"
+    fi
+  fi
+
+  if [ "$o" -gt 0 ]; then
+    echo "---"
+    zswap_pages=$((zswap_orig / 4))
+    echo "swap已用中 zswap 拦截占比: 近似 ${zswap_pages:-0} / $((swap_used / 4)) pages"
+    echo "swap已用中 zram 实存占比: $zram_pages / $((swap_used / 4)) pages"
+  fi
+fi

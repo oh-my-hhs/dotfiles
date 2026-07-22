@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+echo "========================================
+  zram + zswap 状态监控
+========================================"
+
+# ---------- zswap ----------
+if [ -d /sys/module/zswap/parameters ]; then
+  echo "--- zswap ---"
+  grep -E "Zswap|Zswapped" /proc/meminfo | awk '{
+    if ($1 ~ /^Zswap:/)     printf "zswap 池物理占用: %s\n", $2" "($3?$3:"kB")
+    if ($1 ~ /^Zswapped:/)  printf "zswap 压缩前原始: %s\n", $2" "($3?$3:"kB")
+  }'
+  if [ -f /sys/module/zswap/parameters/enabled ]; then
+    echo "zswap enabled:      $(cat /sys/module/zswap/parameters/enabled)"
+    echo "zswap compressor:   $(cat /sys/module/zswap/parameters/compressor)"
+    echo "zswap max_pool:     $(cat /sys/module/zswap/parameters/max_pool_percent)% of RAM"
+  fi
+fi
+
+# ---------- zram ----------
+if [ -e /sys/block/zram0/mm_stat ]; then
+  printf '\n--- zram ---\n'
+  zramctl 2>/dev/null
+
+  printf '\n--- 压缩效率 ---\n'
+  read -r o c m _ < /sys/block/zram0/mm_stat
+  printf "原始数据:  %s\n压缩后:    %s\n物理占用:  %s\n" \
+    "$(numfmt --to=iec "$o")" \
+    "$(numfmt --to=iec "$c")" \
+    "$(numfmt --to=iec "$m")"
+  if [ "$c" -gt 0 ]; then
+    printf "压缩比:    %s:1\n节省内存:  %s\n" \
+      "$(awk "BEGIN {printf \"%.1f\", $o/$c}")" \
+      "$(numfmt --to=iec $(($o - $m)))"
+  fi
+fi
+
+printf '\n--- 内存全景 ---\n'
+free -h
+
+printf '\n--- 生命周期累计 IO (zram) ---\n'
+read -r rio _ rsec _ wio _ wsec _ < /sys/block/zram0/stat
+printf "读取:   %d 次 (%s)\n写入:   %d 次 (%s)\n" \
+  "$rio" "$(numfmt --to=iec $((rsec * 512)))" \
+  "$wio" "$(numfmt --to=iec $((wsec * 512)))"
+
+# 全链路汇总
+if [ -f /sys/module/zswap/parameters/enabled ] && [ -e /sys/block/zram0/mm_stat ]; then
+  printf '\n--- 全链路: 内存 → zswap → zram ---\n'
+  read -r o _ _ _ _ _ _ _ _ < /sys/block/zram0/mm_stat
+  zswap_orig=$(awk '/^Zswapped:/ {print $2}' /proc/meminfo 2>/dev/null || echo 0)
+  zswap_pool=$(awk '/^Zswap:/ {print $2}' /proc/meminfo 2>/dev/null || echo 0)
+  if [ "$zswap_pool" -gt 0 ]; then
+    printf "zswap 池实际内存: %s  (存储了压缩后的数据)\n" "$(numfmt --to=iec $((zswap_pool * 1024)))"
+    printf "zswap 原始数据:   %s  (压缩前大小)\n" "$(numfmt --to=iec $((zswap_orig * 1024)))"
+    printf "zswap 压缩比:     %s:1\n" "$(awk "BEGIN {printf \"%.1f\", $zswap_orig/$zswap_pool}")"
+  fi
+  printf "zram 实存数据:    %s  (zswap 溢出/直写)\n" "$(numfmt --to=iec "$o")"
+fi
+printf '\n'

@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SERVICE=systemd-zram-setup@zram0.service
+
+status() {
+  if systemctl -q is-active "$SERVICE" 2>/dev/null; then
+    echo "zram: 已开启 (active)"
+    zramctl 2>/dev/null | tail -n +2
+  else
+    echo "zram: 已关闭 (inactive)"
+  fi
+  echo "swap 用量: $(free -h | awk '/交换/{print $3}')"
+}
+
+on() {
+  if systemctl -q is-active "$SERVICE" 2>/dev/null; then
+    echo "zram 已开启，无需操作"
+    return
+  fi
+  echo "启动 $SERVICE ..."
+  sudo systemctl start "$SERVICE"
+  echo "完成"
+  status
+}
+
+off() {
+  if ! systemctl -q is-active "$SERVICE" 2>/dev/null; then
+    echo "zram 已关闭，无需操作"
+    return
+  fi
+  avail=$(awk '/MemAvailable/{print $2}' /proc/meminfo)
+  swap_used=$(awk '/zram0/{print $4}' /proc/swaps 2>/dev/null || echo 0)
+  if [ "$swap_used" -gt 0 ] && [ "$avail" -lt "$swap_used" ]; then
+    echo "警告: 可用内存($(numfmt --to=iec $((avail*1024)))) < swap 用量($(numfmt --to=iec $((swap_used*1024))))"
+    echo "关闭后可能 OOM，是否继续？ [y/N]"
+    read -r confirm
+    [ "$confirm" != y ] && [ "$confirm" != Y ] && echo "已取消" && exit 1
+  fi
+  echo "停止 $SERVICE ..."
+  sudo systemctl stop "$SERVICE"
+  echo "完成"
+  status
+}
+
+case "${1:-status}" in
+  on|start|enable)  on  ;;
+  off|stop|disable) off ;;
+  restart)
+    echo "重启 $SERVICE ..."
+    sudo systemctl restart "$SERVICE" 2>/dev/null ||
+      { off; on; }
+    status
+    ;;
+  status|*) status ;;
+esac
